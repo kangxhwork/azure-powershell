@@ -26,11 +26,11 @@ $lbConfig = @{name = "az-lb-fta-bck"; location = $location}
 $saConfig = @{name = "azsaftabck"; location = $location; sku="Standard_LRS"}
 $avsetConfig = @{name = "az-avset-fta-bck"; location = $location; }
 $vmConfig = @(
-            @{name="azvmftabckdc";   location = $location; nicName = "nic01-azvmftabckdc";   image = $osImage; size = "Standard_A1"; ip = "10.20.0.4"; RDPNATPort = 64384; cred = $vmCred}; 
-            @{name="azvmftabckdpm";  location = $location; nicName = "nic01-azvmftabckdpm";  image = $osImage; size = "Standard_A2"; ip = "10.20.0.5"; RDPNATPort = 64385; cred = $vmCred};
-            @{name="azvmftabckabs";  location = $location; nicName = "nic01-azvmftabckabs";  image = $osImage; size = "Standard_A2"; ip = "10.20.0.6"; RDPNATPort = 64386; cred = $vmCred};
-            @{name="azvmftabckapp1"; location = $location; nicName = "nic01-azvmftabckapp1"; image = $osImage; size = "Standard_A2"; ip = "10.20.0.7"; RDPNATPort = 64387; cred = $vmCred};
-            @{name="azvmftabckapp2"; location = $location; nicName = "nic01-azvmftabckapp2"; image = $osImage; size = "Standard_A2"; ip = "10.20.0.8"; RDPNATPort = 64388; cred = $vmCred}
+            @{name="azvmftabckdc";   location = $location; nicName = "nic01-azvmftabckdc";   image = $osImage; size = "Standard_A2_v2"; ip = "10.20.0.4"; RDPNATPort = 64384; cred = $vmCred}; 
+            @{name="azvmftabckdpm";  location = $location; nicName = "nic01-azvmftabckdpm";  image = $osImage; size = "Standard_A2_v2"; ip = "10.20.0.5"; RDPNATPort = 64385; cred = $vmCred};
+            @{name="azvmftabckabs";  location = $location; nicName = "nic01-azvmftabckabs";  image = $osImage; size = "Standard_A2_v2"; ip = "10.20.0.6"; RDPNATPort = 64386; cred = $vmCred};
+            @{name="azvmftabckapp1"; location = $location; nicName = "nic01-azvmftabckapp1"; image = $osImage; size = "Standard_A2_v2"; ip = "10.20.0.7"; RDPNATPort = 64387; cred = $vmCred};
+            @{name="azvmftabckapp2"; location = $location; nicName = "nic01-azvmftabckapp2"; image = $osImage; size = "Standard_A2_v2"; ip = "10.20.0.8"; RDPNATPort = 64388; cred = $vmCred}
         )
 
 # create resource group.
