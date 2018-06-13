@@ -113,5 +113,5 @@ for ($i=0; $i -lt $vmConfig.Count; $i++){
         Set-AzureRmVMOSDisk -Name "$($vmConfig[$i].name)-OSDisk" -VhdUri "https://$($saConfig.name).blob.core.windows.net/vhds/$($vmConfig[$i].name)-OSDisk.vhd" -Caching ReadOnly -CreateOption fromImage  | 
         Add-AzureRmVMNetworkInterface -Id $nics[$i].Id
     
-    New-AzureRmVM -ResourceGroupName $rgConfig.name -Location $vmConfig[$i].Location -VM $vm
+    New-AzureRmVM -ResourceGroupName $rgConfig.name -Location $vmConfig[$i].Location -VM $vm -AsJob
 }
