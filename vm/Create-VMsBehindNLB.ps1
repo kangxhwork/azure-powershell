@@ -60,7 +60,6 @@ else{
     $pip = New-AzureRmPublicIpAddress -ResourceGroupName $rgConfig.name -Name $pipConfig.name -Location $pipConfig.location -AllocationMethod Dynamic -DomainNameLabel $pipConfig.dns
 }
 
-
 # create nlb, if nlb has been created but still need to check NAT rules. 
 $lb = Get-AzureRmLoadBalancer -ResourceGroupName $rgConfig.name -Name $lbConfig.name -ErrorAction Ignore
 if ($lb) {
