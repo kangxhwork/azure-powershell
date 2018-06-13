@@ -24,6 +24,7 @@ $vnetConfig = @{name = "az-vnet-fta-bck"; ip = "10.20.0.0/16"; location = $locat
 $pipConfig = @{name = "az-pip-fta-bck"; ip = "dynamic" ; location = $location ; dns = "az-pip-fta-bck"}
 $lbConfig = @{name = "az-lb-fta-bck"; location = $location}
 $saConfig = @{name = "azsaftabck"; location = $location; sku="Standard_LRS"}
+$avsetConfig = @{name = "az-avset-fta-bck"; location = $location; }
 $vmConfig = @(
             @{name="azvmftabckdc";   location = $location; nicName = "nic01-azvmftabckdc";   image = $osImage; size = "Standard_A1"; ip = "10.20.0.4"; RDPNATPort = 64384; cred = $vmCred}; 
             @{name="azvmftabckdpm";  location = $location; nicName = "nic01-azvmftabckdpm";  image = $osImage; size = "Standard_A2"; ip = "10.20.0.5"; RDPNATPort = 64385; cred = $vmCred};
@@ -37,10 +38,19 @@ New-AzureRmResourceGroup -Name $rgConfig.name -Location $rgConfig.location -Forc
 
 # create vnet
 $vnet = Get-AzureRmVirtualNetwork -Name $vnetConfig.name -ResourceGroupName $rgConfig.name -ErrorAction Ignore
-if($vnet){}
+if($vnet){
+    $subnet = Get-AzureRmVirtualNetworkSubnetConfig -Name $vnetConfig.subnet -VirtualNetwork $vnet -ErrorAction Ignore
+}
 else{
     $subnet = New-AzureRmVirtualNetworkSubnetConfig -Name $vnetConfig.subnet -AddressPrefix $vnetConfig.subnetprefix
     $vnet = New-AzureRmVirtualNetwork -Name $vnetConfig.name -ResourceGroupName $rgConfig.name -Location $vnetConfig.location -AddressPrefix $vnetConfig.ip -Subnet $subnet
+}
+
+# create avset
+$avset = Get-AzureRmAvailabilitySet -ResourceGroupName $rgConfig.name  -Name $avsetconfig.name -ErrorAction Ignore
+if ($avset){}
+else{
+    $avset = New-AzureRmAvailabilitySet -ResourceGroupName $rgConfig.name  -Name $avsetconfig.name -Location $avsetconfig.location -PlatformFaultDomainCount 2 -PlatformUpdateDomainCount 5
 }
 
 # create pip
@@ -83,7 +93,6 @@ else{
 
 # create nic
 $nics=@()
-$subnet = Get-AzureRmVirtualNetworkSubnetConfig -Name $vnetConfig.subnet -VirtualNetwork $vnet -ErrorAction Ignore
 for ($i=0; $i -lt $vmConfig.Count; $i++){
 
     $nic = Get-AzureRmNetworkInterface -ResourceGroupName $rgConfig.name -Name $vmConfig[$i].nicname
@@ -107,7 +116,7 @@ else{
 
 # create vm using windows image
 for ($i=0; $i -lt $vmConfig.Count; $i++){
-    $vm = New-AzureRmVMConfig -VMName $vmConfig[$i].name -VMSize $vmConfig[$i].size |
+    $vm = New-AzureRmVMConfig -VMName $vmConfig[$i].name -VMSize $vmConfig[$i].size -AvailabilitySetId $avset.id |
         Set-AzureRmVMOperatingSystem -Windows -ComputerName $vmConfig[$i].name -Credential $vmConfig[$i].cred -ProvisionVMAgent -EnableAutoUpdate  |
         Set-AzureRmVMSourceImage -PublisherName  $vmConfig[$i].image.PublisherName -Offer  $vmConfig[$i].image.offer -Skus  $vmConfig[$i].image.skus -Version  $vmConfig[$i].image.version | 
         Set-AzureRmVMOSDisk -Name "$($vmConfig[$i].name)-OSDisk" -VhdUri "https://$($saConfig.name).blob.core.windows.net/vhds/$($vmConfig[$i].name)-OSDisk.vhd" -Caching ReadOnly -CreateOption fromImage  | 
