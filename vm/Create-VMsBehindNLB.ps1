@@ -19,8 +19,6 @@ $vmCred = New-Object System.Management.Automation.PSCredential ($admin, $adminPW
 $location = "southeastasia"
 $osImage = ((Get-AzureRmVMImage -Location 'Southeast Asia' -PublisherName "MicrosoftWindowsServer" -Offer "WindowsServer" -Skus "2016-Datacenter" ) | Sort-Object –Descending Version)[0]
 
-$OSImage = @{publisher= "MicrosoftWindowsServer"; offer = "WindowsServer" ; skus = "2016-Datacenter"; version = ""}
-
 $rgConfig = @{name = "az-rg-fta-bck"; location = $location}
 $vnetConfig = @{name = "az-vnet-fta-bck"; ip = "10.20.0.0/16"; location = $location; subnet = "backup"; subnetprefix = "10.20.0.0/24"}
 $pipConfig = @{name = "az-pip-fta-bck"; ip = "dynamic" ; location = $location ; dns = "az-pip-fta-bck"}
@@ -85,7 +83,7 @@ else{
 
 # create nic
 $nics=@()
-$subnet = Get-AzureRmVirtualNetworkSubnetConfig -Name $vnetConfig.subnet -VirtualNetwork $vnet
+$subnet = Get-AzureRmVirtualNetworkSubnetConfig -Name $vnetConfig.subnet -VirtualNetwork $vnet -ErrorAction Ignore
 for ($i=0; $i -lt $vmConfig.Count; $i++){
 
     $nic = Get-AzureRmNetworkInterface -ResourceGroupName $rgConfig.name -Name $vmConfig[$i].nicname
@@ -101,7 +99,7 @@ for ($i=0; $i -lt $vmConfig.Count; $i++){
 }
 
 # create storage account: 
-$sa = Get-AzureRmStorageAccount -ResourceGroupName $rgConfig.name -Name $saConfig.name 
+$sa = Get-AzureRmStorageAccount -ResourceGroupName $rgConfig.name -Name $saConfig.name -ErrorAction Ignore
 if ($sa) {}
 else{
     $sa = New-AzureRmStorageAccount -ResourceGroupName $rgConfig.name -Name $saConfig.name -Location $saConfig.location -Type $saConfig.sku
@@ -117,4 +115,3 @@ for ($i=0; $i -lt $vmConfig.Count; $i++){
     
     New-AzureRmVM -ResourceGroupName $rgConfig.name -Location $vmConfig[$i].Location -VM $vm
 }
-
