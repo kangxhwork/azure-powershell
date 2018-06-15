@@ -8,28 +8,20 @@ $azEnv=@{rg="az-rg-fta-iaas"; localtion = "southeastasia"; vnet="az-vnet-fta"; g
 
 #login to mooncake 
 Add-AzureRMAccount-Allenk -myAzureEnv mooncake
-$MCSubID = "c4013028-2728-46b8-acf1-e397840c4344"
-$MCRGName = "mooncake.allenk.lab"
-$MCLocation = "China North"
-$MCGWName = "mc-vpn-gw"
-$MCvNetName = "mooncake.allenk.lab"
-$MCGWPIPName = "mc-pip-vpn"
-$MCGWSubnetPrefix = "10.1.254.0/24"
-$GWSubnetName = "GatewaySubnet"
 
-$mcRG = Get-AzureRmResourceGroup -Name $mcEnv -Location
-$MCvNet = Get-AzureRmVirtualNetwork -Name $MCvNetName -ResourceGroupName $MCRGName
+$mcRg = Get-AzureRmResourceGroup -Name $mcEnv.rg -Location $mcEnv.localtion
+$mcVnet = Get-AzureRmVirtualNetwork -Name $mcEnv.vnet -ResourceGroupName $mcEnv.rg
 
 # Create PIP if it does not exist:
-$MCPip = Get-AzureRmPublicIpAddress -Name $MCGWPIPName -ResourceGroupName $MCRGName -ErrorAction Ignore
-if ($MCPip -eq $null)
+$mcPip = Get-AzureRmPublicIpAddress -Name $mcEnv.pip -ResourceGroupName $mcenv.rg -ErrorAction Ignore
+if ($mcPip -eq $null)
 {
-    $MCPip  = New-AzureRmPublicIpAddress -Name $MCGWPIPName -ResourceGroupName $MCRGName -Location $MCLocation -AllocationMethod Dynamic
+    $mcPip  = New-AzureRmPublicIpAddress -Name $mcEnv.pip -ResourceGroupName $mcEnv.rg -Location $mcEnv.localtion -AllocationMethod Dynamic
 }
 
 # Create Gateway subnet if it has not been created.
-$MCGWSubnet = Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $MCvNet -Name $GWSubnetName -ErrorAction Ignore
-if ($MCGWSubnet -eq $null)
+$mcGatewaySubnet = Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $mcVnet -Name "GatewaySubnet" -ErrorAction Ignore
+if ($mcGatewaySubnet -eq $null)
 {
     Add-AzureRmVirtualNetworkSubnetConfig -Name $GWSubnetName -AddressPrefix $MCGWSubnetPrefix -VirtualNetwork $MCvNet | Set-AzureRmVirtualNetwork
 }
