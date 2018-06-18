@@ -4,8 +4,8 @@
 
 Import-Module C:\kangxh\PowerShell\allenk-Module-Azure.psm1
 
-$mcEnv=@{rg="mc-rg-fta-iaas"; localtion = "chinanorth";    vnet="mc-vnet-fta"; gateway="mc-vpn-fta"; pip="mc-pip-fta-vpngw"; localgateway = "mc-vpn-fta-localgw"; localgatewayconnection="mc-vpn-fta-localgw-connection"}
-$azEnv=@{rg="az-rg-fta-iaas"; localtion = "southeastasia"; vnet="az-vnet-fta"; gateway="az-vpn-fta"; pip="az-pip-fta-vpngw"; localgateway = "az-vpn-fta-localgw"; localgatewayconnection="az-vpn-fta-localgw-connection"}
+$mcEnv=@{rg="mc-rg-fta-core"; localtion = "chinanorth";    vnet="mc-vnet-fta"; gateway="mc-vpn-fta"; pip="mc-pip-fta-vpngw"; localgateway = "mc-vpn-fta-localgw"; localgatewayconnection="mc-vpn-fta-localgw-connection"}
+$azEnv=@{rg="az-rg-fta-core"; localtion = "southeastasia"; vnet="az-vnet-fta"; gateway="az-vpn-fta"; pip="az-pip-fta-vpngw"; localgateway = "az-vpn-fta-localgw"; localgatewayconnection="az-vpn-fta-localgw-connection"}
 $SharedKey = 'AzureA1b2C3'
 #login to mooncake to create gateway
 Add-AzureRMAccount-Allenk -myAzureEnv mooncake
@@ -69,13 +69,12 @@ if ($azGateway -eq $null){
 Get-Job | Wait-Job
 
 # Create local gateway and connection to bridge virtual networks
+if (($mcGateway -ne $null) -and ($azGateway -ne $null)){
     Add-AzureRMAccount-Allenk -myAzureEnv mooncake
-
     $mcLocalGateway = New-AzureRmLocalNetworkGateway -Name $mcEnv.localgateway -ResourceGroupName $mcEnv.rg -Location $mcEnv.location -GatewayIpAddress $azPip.IpAddress  -AddressPrefix $azVNET.AddressSpace
     New-AzureRmVirtualNetworkGatewayConnection -Name $mcEnv.localgatewayconnection -ResourceGroupName $mcEnv.rg -Location $mcEnv.localtion -VirtualNetworkGateway1 $mcGateway -LocalNetworkGateway2 $mcLocalGateway -ConnectionType IPsec -RoutingWeight 10 -SharedKey $SharedKey
 
-# Step 4: On Global Azure, create AzGW-MCGW connection
-Add-AzureRMAccount-Allenk -myAzureEnv microsoft
-
-$azLocalGateway = New-AzureRmLocalNetworkGateway -Name $azEnv.localgateway -ResourceGroupName $azEnv.rg -Location $azEnv.location -GatewayIpAddress $mcPip.IpAddress  -AddressPrefix $mcVNET.AddressSpace
-New-AzureRmVirtualNetworkGatewayConnection -Name $azEnv.localgatewayconnection -ResourceGroupName $azEnv.rg -Location $azEnv.localtion -VirtualNetworkGateway1 $azGateway -LocalNetworkGateway2 $azLocalGateway -ConnectionType IPsec -RoutingWeight 10 -SharedKey $SharedKey
+    Add-AzureRMAccount-Allenk -myAzureEnv microsoft
+    $azLocalGateway = New-AzureRmLocalNetworkGateway -Name $azEnv.localgateway -ResourceGroupName $azEnv.rg -Location $azEnv.location -GatewayIpAddress $mcPip.IpAddress  -AddressPrefix $mcVNET.AddressSpace
+    New-AzureRmVirtualNetworkGatewayConnection -Name $azEnv.localgatewayconnection -ResourceGroupName $azEnv.rg -Location $azEnv.localtion -VirtualNetworkGateway1 $azGateway -LocalNetworkGateway2 $azLocalGateway -ConnectionType IPsec -RoutingWeight 10 -SharedKey $SharedKey
+}
