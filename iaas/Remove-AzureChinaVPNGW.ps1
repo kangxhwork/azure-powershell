@@ -1,71 +1,53 @@
-# Part 1: On Mooncake, delete VPN GW, Local Gateway, VPN Connection
+Import-Module C:\kangxh\PowerShell\allenk-Module-Azure.psm1
 
-    $MCconnectionName = "MCRunAsConnection"   
-    $MCservicePrincipalConnection=Get-AutomationConnection -Name $MCconnectionName         
-    $MCEnv = Get-AzureRmEnvironment -Name AzureChinaCloud
+$mcEnv=@{rg="mc-rg-fta-core"; location = "chinanorth";    vnet="mc-vnet-fta"; gateway="mc-vpn-fta"; pip="mc-pip-fta-vpngw"; localgateway = "mc-vpn-fta-localgw"; localgatewayconnection="mc-vpn-fta-localgw-connection"}
+$azEnv=@{rg="az-rg-fta-core"; location = "southeastasia"; vnet="az-vnet-fta"; gateway="az-vpn-fta"; pip="az-pip-fta-vpngw"; localgateway = "az-vpn-fta-localgw"; localgatewayconnection="az-vpn-fta-localgw-connection"}
 
-    Add-AzureRmAccount -Environment $MCEnv -ServicePrincipal -TenantId $MCservicePrincipalConnection.TenantId -ApplicationId $MCservicePrincipalConnection.ApplicationId -CertificateThumbprint $MCservicePrincipalConnection.CertificateThumbprint 
-    Set-AzureRmContext -SubscriptionId c4013028-2728-46b8-acf1-e397840c4344
-    
-    $Connection = Get-AzureRmVirtualNetworkGatewayConnection -Name mc-connection-az-gw -ResourceGroupName mooncake.allenk.lab -ErrorAction Ignore
-    if ($Connection -ne $null)
-    {
-        "remove Mooncake connection"
-        Remove-AzureRmVirtualNetworkGatewayConnection -Name mc-connection-az-gw -ResourceGroupName mooncake.allenk.lab -Force
+
+#Part 1: On Mooncake, delete VPN GW, Local Gateway, VPN Connection, as PIP is the last resource to delete. if PIP is not there, no need to continue
+Add-AzureRMAccount-Allenk -myAzureEnv mooncake
+
+$mcPip = Get-AzureRmPublicIpAddress -Name $mcEnv.pip -ResourceGroupName $mcEnv.rg -ErrorAction Ignore
+if ($mcPip -ne $null) {
+
+    $mcLocalGatewayConnection = Get-AzureRmVirtualNetworkGatewayConnection -Name $mcEnv.localgatewayconnection -ResourceGroupName $mcEnv.rg -ErrorAction Ignore
+    if ($mcLocalGatewayConnection -ne $null) {
+        Remove-AzureRmVirtualNetworkGatewayConnection -Name $mcEnv.localgatewayconnection -ResourceGroupName $mcEnv.rg -Force
     }
 
-    $localGW = get-AzureRmLocalNetworkGateway -Name mc-local-gw-az -ResourceGroupName "mooncake.allenk.lab" -ErrorAction Ignore
-    if ($localGW -ne $null)
-    {
-        "remove Mooncake local gateway"
-        Remove-AzureRmLocalNetworkGateway -Name mc-local-gw-az -ResourceGroupName mooncake.allenk.lab -Force
+    $mcLocalGateway = get-AzureRmLocalNetworkGateway -Name $mcEnv.localgateway -ResourceGroupName $mcEnv.rg -ErrorAction Ignore
+    if ($mcLocalGateway -ne $null) {
+        Remove-AzureRmLocalNetworkGateway -Name $mcEnv.localgateway -ResourceGroupName $mcEnv.rg -Force
     }
 
-    $GW = Get-AzureRmVirtualNetworkGateway -Name mc-vpn-gw -ResourceGroupName mooncake.allenk.lab -ErrorAction Ignore
-    if ($GW -ne $null)
-    {
-        "remove Mooncake gateway"
-        Remove-AzureRmVirtualNetworkGateway -Name mc-vpn-gw -ResourceGroupName mooncake.allenk.lab -Force
+    $mcGateway = Get-AzureRmVirtualNetworkGateway -Name $mcEnv.gateway -ResourceGroupName $mcEnv.rg -ErrorAction Ignore
+    if ($mcGateway -ne $null) {
+        Remove-AzureRmVirtualNetworkGateway -Name $mcEnv.gateway -ResourceGroupName $mcEnv.rg -Force
     }
 
-    $GWPIP = Get-AzureRmPublicIpAddress -Name mc-pip-vpn -ResourceGroupName mooncake.allenk.lab -ErrorAction Ignore
-    if ($GWPIP -ne $null)
-    {
-        "Remove Mooncake PIP"
-        Remove-AzureRmPublicIpAddress -Name mc-pip-vpn -ResourceGroupName mooncake.allenk.lab -Force 
+    Remove-AzureRmPublicIpAddress -Name $mcEnv.pip -ResourceGroupName $mcEnv.rg -Force 
+}
+
+#Part 2: On global azure, delete VPN GW, Local Gateway, VPN Connection
+Add-AzureRMAccount-Allenk -myAzureEnv microsoft
+
+$azPip = Get-AzureRmPublicIpAddress -Name $azEnv.pip -ResourceGroupName $azEnv.rg -ErrorAction Ignore
+if ($azPip -ne $null) {
+
+    $azLocalGatewayConnection = Get-AzureRmVirtualNetworkGatewayConnection -Name $azEnv.localgatewayconnection -ResourceGroupName $azEnv.rg -ErrorAction Ignore
+    if ($azLocalGatewayConnection -ne $null) {
+        Remove-AzureRmVirtualNetworkGatewayConnection -Name $azEnv.localgatewayconnection -ResourceGroupName $azEnv.rg -Force
     }
 
-# Part 2: on Global Azure, Delete UDR
-
-    $AzConnectionName = "AzureRunAsConnection"
-    $AzServicePrincipalConnection=Get-AutomationConnection -Name $AzConnectionName         
-    Add-AzureRmAccount -ServicePrincipal -TenantId $AzServicePrincipalConnection.TenantId -ApplicationId $AzServicePrincipalConnection.ApplicationId -CertificateThumbprint $AzServicePrincipalConnection.CertificateThumbprint 
-    Set-AzureRmContext -SubscriptionId 9c6835cb-2079-4f99-96f4-74029267e0df
-
-    $Connection = Get-AzureRmVirtualNetworkGatewayConnection -Name az-connection-mc-gw -ResourceGroupName azure.allenk.lab -ErrorAction Ignore
-    if ($Connection -ne $null)
-    {
-        "remove Azure connection"
-        Remove-AzureRmVirtualNetworkGatewayConnection -Name az-connection-mc-gw -ResourceGroupName azure.allenk.lab -Force
+    $azLocalGateway = get-AzureRmLocalNetworkGateway -Name $azEnv.localgateway -ResourceGroupName $azEnv.rg -ErrorAction Ignore
+    if ($azLocalGateway -ne $null) {
+        Remove-AzureRmLocalNetworkGateway -Name $azEnv.localgateway -ResourceGroupName $azEnv.rg -Force
     }
 
-    $localGW = get-AzureRmLocalNetworkGateway -Name az-local-gw-mc -ResourceGroupName "azure.allenk.lab" -ErrorAction Ignore
-    if ($localGW -ne $null)
-    {
-        "remove Azure local gateway"
-        Remove-AzureRmLocalNetworkGateway -Name az-local-gw-mc -ResourceGroupName azure.allenk.lab -Force
+    $azGateway = Get-AzureRmVirtualNetworkGateway -Name $azEnv.gateway -ResourceGroupName $azEnv.rg -ErrorAction Ignore
+    if ($azGateway -ne $null) {
+        Remove-AzureRmVirtualNetworkGateway -Name $azEnv.gateway -ResourceGroupName $azEnv.rg -Force
     }
 
-    $GW = Get-AzureRmVirtualNetworkGateway -Name az-vpn-gw -ResourceGroupName azure.allenk.lab -ErrorAction Ignore
-    if ($GW -ne $null)
-    {
-        "remove Azure gateway"
-        Remove-AzureRmVirtualNetworkGateway -Name az-vpn-gw -ResourceGroupName azure.allenk.lab -Force
-    }
-
-    $GWPIP = Get-AzureRmPublicIpAddress -Name az-pip-vpn -ResourceGroupName azure.allenk.lab -ErrorAction Ignore
-    if ($GWPIP -ne $null)
-    {
-        "remove Azure PIP"
-        Remove-AzureRmPublicIpAddress -Name az-pip-vpn -ResourceGroupName azure.allenk.lab -Force 
-    }
+    Remove-AzureRmPublicIpAddress -Name $azEnv.pip -ResourceGroupName $azEnv.rg -Force 
+}
