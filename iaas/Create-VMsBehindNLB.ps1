@@ -61,21 +61,6 @@ else{
     $pip = New-AzureRmPublicIpAddress -ResourceGroupName $rgConfig.name -Name $pipConfig.name -Location $pipConfig.location -AllocationMethod Dynamic -DomainNameLabel $pipConfig.dns
 }
 
-# create nic
-$nics=@()
-for ($i=0; $i -lt $vmConfig.Count; $i++){
-
-    $nic = Get-AzureRmNetworkInterface -ResourceGroupName $rgConfig.name -Name $vmConfig[$i].nicname -ErrorAction Ignore
-    if ($nic) {
-        $nics += $nic 
-    }
-    else{
-        $nic = New-AzureRmNetworkInterface -ResourceGroupName $rgConfig.name -Name $vmConfig[$i].nicname -Location $vmconfig[$i].location -Subnet $subnet `
-            -LoadBalancerInboundNatRule $lb.InboundNatRules[$i] -LoadBalancerBackendAddressPool $lb.BackendAddressPools[0] -PrivateIpAddress $vmConfig[$i].ip 
-        $nics += $nic 
-    }
-}
-
 # create nlb, if nlb has been created but still need to check NAT rules. 
 $lb = Get-AzureRmLoadBalancer -ResourceGroupName $rgConfig.name -Name $lbConfig.name -ErrorAction Ignore
 if ($lb) {
@@ -104,6 +89,21 @@ else{
 
     $lb = New-AzureRmLoadBalancer -ResourceGroupName $rgconfig.name -Location $lbConfig.location -Name $lbConfig.name `
         -FrontendIpConfiguration $feIpConfig -InboundNatRule $inboundNATRules -BackendAddressPool $beAddressPool -Probe $healthProbe
+}
+
+# create nic
+$nics=@()
+for ($i=0; $i -lt $vmConfig.Count; $i++){
+
+    $nic = Get-AzureRmNetworkInterface -ResourceGroupName $rgConfig.name -Name $vmConfig[$i].nicname -ErrorAction Ignore
+    if ($nic) {
+        $nics += $nic 
+    }
+    else{
+        $nic = New-AzureRmNetworkInterface -ResourceGroupName $rgConfig.name -Name $vmConfig[$i].nicname -Location $vmconfig[$i].location -Subnet $subnet `
+            -LoadBalancerInboundNatRule $lb.InboundNatRules[$i] -LoadBalancerBackendAddressPool $lb.BackendAddressPools[0] -PrivateIpAddress $vmConfig[$i].ip 
+        $nics += $nic 
+    }
 }
 
 # create storage account: 
