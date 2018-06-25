@@ -7,7 +7,6 @@
 # -- 1 NLB: az-lb-fta-bck
 # -- 1 PIP: az-pip-fta-back
 # -- 1 SA: azsaftabck, used for host all the vm disks and diagnostic log. 
-
 Import-Module C:\kangxh\PowerShell\allenk-Module-Azure.psm1
 Add-AzureRMAccount-Allenk -myAzureEnv microsoft
 
@@ -32,7 +31,7 @@ $vmConfig = @(
             @{name="azvmftabckapp1"; location = $location; nicName = "nic01-azvmftabckapp1"; image = $osImage; size = "Standard_A2_v2"; ip = "10.20.0.7"; RDPNATPort = 64387; cred = $vmCred};
             @{name="azvmftabckapp2"; location = $location; nicName = "nic01-azvmftabckapp2"; image = $osImage; size = "Standard_A2_v2"; ip = "10.20.0.8"; RDPNATPort = 64388; cred = $vmCred};
             @{name="azvmftabckhv1"; location = $location; nicName = "nic01-azvmftabckhv1"; image = $osImage; size = "Standard_D2_v3"; ip = "10.20.0.9"; RDPNATPort = 64389; cred = $vmCred};
-            @{name="azvmftabckhv2"; location = $location; nicName = "nic01-azvmftabckhv2"; image = $osImage; size = "Standard_A2_v3"; ip = "10.20.0.10"; RDPNATPort = 64390; cred = $vmCred}
+            @{name="azvmftabckhv2"; location = $location; nicName = "nic01-azvmftabckhv2"; image = $osImage; size = "Standard_D2_v3"; ip = "10.20.0.10"; RDPNATPort = 64390; cred = $vmCred}
         )
 
 # create resource group.
