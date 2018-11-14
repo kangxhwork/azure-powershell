@@ -28,7 +28,7 @@ $contextEnv = Get-AzureRmContext
     $nlbCfg =   @{name = "ftanlbce2oss";      resourcegroup = "fta-rg-ce2-oss"; location = $location}
     $pipCfg   = @{name = "ftapipce2oss";      resourcegroup = "fta-rg-ce2-oss"; location = $location; dns = "ftapipce2oss"; allocation= "dynamic"}
 
-    $vmCfg = @{name="ftavmce2rhel1"; resourcegroup = "fta-rg-ce2-oss"; location = $location; nicName = "nic01-ftavmce2rhel1"; diskname = "ftavmce2rhel1-os"; ostype = "Linux"; diskuri="https://ftasace2corev1.blob.core.chinacloudapi.cn/vhds/RHEL75.vhd"; storagesku="Standard_LRS"; size = "Standard_A2_v2"; ip = "192.168.4.11"; natrule = "SSH-ftavmce2rhel1"; frontendport = 61122; backendport = 22}; 
+    $vmCfg = @{name="ftavmce2centos"; resourcegroup = "fta-rg-ce2-oss"; location = $location; nicName = "nic01-ftavmce2centos"; diskname = "ftavmce2centos-os"; ostype = "Linux"; diskuri="https://ftasace2corev1.blob.core.chinacloudapi.cn/vhds/centos73.vhd"; storagesku="Standard_LRS"; size = "Standard_A2_v2"; ip = "192.168.4.12"; natrule = "SSH-ftavmce2centos"; frontendport = 61222; backendport = 22}; 
 
 
 # Provisioning
@@ -86,11 +86,24 @@ $contextEnv = Get-AzureRmContext
 
         $nlb = New-AzureRmLoadBalancer -ResourceGroupName $nlbCfg.resourcegroup -Location $nlbCfg.location -Name $nlbCfg.name -FrontendIpConfiguration $feIpConfig -InboundNatRule $natrule -BackendAddressPool $beAddressPool -Probe $healthProbe
     }
+    else{
+
+        $feIpConfig = Get-AzureRmLoadBalancerFrontendIpConfig -LoadBalancer $nlb
+        $inboundNatRuleConfig = Get-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $nlb
+        $beAddressPoolConfig = Get-AzureRmLoadBalancerBackendAddressPoolConfig -LoadBalancer $nlb
+    
+        if (($beAddressPoolConfig.Name -eq "backendPool-$($avset.name)") -and ($feIpConfig.Name -eq "frontendIP-$($pip.name)")){ # this VM has same PIP configure and belongs to same avset, add NAT rule
+            Add-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $nlb -Name $vmCfg.natrule -FrontendIpConfiguration $feIpConfig -Protocol TCP -FrontendPort $vmCfg.frontendport -BackendPort $vmCfg.backendport | Set-AzureRmLoadBalancer
+
+            $nlb = Get-AzureRmLoadBalancer -ResourceGroupName $nlbCfg.resourcegroup -Name $nlbCfg.name -ErrorAction Ignore
+            $natrule = $nlb.InboundNatRules.GetEnumerator() | where {$_.Name -eq $vmCfg.natrule}
+        }
+    }
 
 # create nic
    $nic = Get-AzureRmNetworkInterface -ResourceGroupName $vmCfg.resourcegroup -Name $vmCfg.nicname -ErrorAction Ignore
     if ($null -eq $nic) {
-        $nic = New-AzureRmNetworkInterface -ResourceGroupName $vmCfg.resourcegroup -Name $vmCfg.nicname -Location $vmCfg.location -Subnet $subnet -LoadBalancerInboundNatRule $nlb.InboundNatRules[0] -LoadBalancerBackendAddressPool $nlb.BackendAddressPools[0] -PrivateIpAddress $vmCfg.ip 
+        $nic = New-AzureRmNetworkInterface -ResourceGroupName $vmCfg.resourcegroup -Name $vmCfg.nicname -Location $vmCfg.location -Subnet $subnet -LoadBalancerInboundNatRule $natrule -LoadBalancerBackendAddressPool $nlb.BackendAddressPools[0] -PrivateIpAddress $vmCfg.ip 
     }
 
 

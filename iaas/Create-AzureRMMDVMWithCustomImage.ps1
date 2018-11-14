@@ -1,6 +1,5 @@
 Import-Module C:\kangxh\PowerShell\allenk-Module-Azure.psm1
 Add-AzureRMAccount-Allenk -myAzureEnv mooncake
-$contextEnv = Get-AzureRmContext
 
 # Naming Conversion
 # ProjectName:   fta
