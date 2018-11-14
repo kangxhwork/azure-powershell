@@ -13,13 +13,20 @@ Add-AzureRMAccount-Allenk -myAzureEnv mooncake
     $location = "chinaeast2"
 
     # shared resources
-    $vnetCfg  = @{name = "ftavnetce2core";  resourcegroup = "fta-rg-ce2-core";  location = $location; ip = "192.168.0.0/16"; subnet = "k8s"; subnetprefix = "192.168.5.0/24"}
-    $imageCfg = @{name = "ftaimagece2rhel"; resourcegroup = "fta-rg-ce2-core";  location = $location; customed=$true}
-    $kvCfg =    @{name = "ftakvce2core";    resourcegroup = "fta-rg-ce2-core";  location = $location; secret = "pwd-vm-k8s"}
+    $vnetCfg  = @{name = "ftavnetce2core";  resourcegroup = "fta-rg-ce2-core";  location = $location; ip = "192.168.0.0/16"; subnet = "win"; subnetprefix = "192.168.6.0/24"}
+    
+    # $imageCfg = @{customed=$true; name = "ftaimagece2rhel"; resourcegroup = "fta-rg-ce2-core";  location = $location}
+    $imageCfg = @{customed=$false; location = $location; publisher = "MicrosoftVisualStudio"; offer = "VisualStudio"; sku = "VS-2015-Comm-VSU3-AzureSDK-29-WS2012R2" }
+    
+    $kvCfg =    @{name = "ftakvce2core";    resourcegroup = "fta-rg-ce2-core";  location = $location; secret = "pwd-vm-win"}
 
     # Get Image
-    $image = Get-AzureRmImage -ResourceGroupName $imageCfg.resourcegroup -ImageName $imageCfg.name
-    
+    if ($imageCfg.customed -eq $true){
+        $image = Get-AzureRmImage -ResourceGroupName $imageCfg.resourcegroup -ImageName $imageCfg.name
+    }
+    else{
+        $image = (Get-AzureRmVMImage -Location $imageCfg.location -PublisherName $imageCfg.publisher -Offer $imageCfg.offer -Skus $imageCfg.sku | Sort-Object -Descending -Property PublishedDate)[0]
+    }
     # Create Credential 
     $adminUsername = Read-Host -Prompt Username
     $Password = Get-AzureKeyVaultSecret -VaultName $kvCfg.name -Name $kvcfg.secret
@@ -30,17 +37,16 @@ Add-AzureRMAccount-Allenk -myAzureEnv mooncake
 # Parameters
 
     # new resources
-    $rgCfg =    @{name = "fta-rg-ce2-k8s";    location = $location}
+    $rgCfg =    @{name = "fta-rg-ce2-win";    location = $location}
 
-    $saCfg =    @{name = "ftasace2k8sndiag";   resourcegroup = "fta-rg-ce2-k8s"; location = $location; sku="Standard_LRS"}
-    $avsetCfg = @{name = "ftaavsetce2k8sn";    resourcegroup = "fta-rg-ce2-k8s"; location = $location}
-    $nlbCfg =   @{name = "ftanlbce2k8sn";      resourcegroup = "fta-rg-ce2-k8s"; location = $location}
-    $pipCfg   = @{name = "ftapipce2k8sn";      resourcegroup = "fta-rg-ce2-k8s"; location = $location; dns = "ftapipce2k8sn"; allocation= "dynamic"}
+    $saCfg =    @{name = "ftasace2windiag";   resourcegroup = "fta-rg-ce2-win"; location = $location; sku="Standard_LRS"}
+    $avsetCfg = @{name = "ftaavsetce2winvs";    resourcegroup = "fta-rg-ce2-win"; location = $location}
+    $nlbCfg =   @{name = "ftanlbce2winvs";      resourcegroup = "fta-rg-ce2-win"; location = $location}
+    $pipCfg   = @{name = "ftapipce2winvs";      resourcegroup = "fta-rg-ce2-win"; location = $location; dns = "ftapipce2winvs"; allocation= "dynamic"}
 
     $vmCfg = @(
-        @{name="ftavmce2k8sn1"; resourcegroup = "fta-rg-ce2-k8s"; location = $location; nicName = "nic01-ftavmce2k8sn1"; image = $osImage; size = "Standard_A2_v2"; ip = "192.168.5.21"; natrule = "SSH-ftavmce2k8sn1"; frontendport = 62122; backendport = 22; cred = $vmCred}; 
-        @{name="ftavmce2k8sn2"; resourcegroup = "fta-rg-ce2-k8s"; location = $location; nicName = "nic01-ftavmce2k8sn2"; image = $osImage; size = "Standard_A2_v2"; ip = "192.168.5.22"; natrule = "SSH-ftavmce2k8sn2"; frontendport = 62222; backendport = 22; cred = $vmCred};
-        @{name="ftavmce2k8sn3"; resourcegroup = "fta-rg-ce2-k8s"; location = $location; nicName = "nic01-ftavmce2k8sn3"; image = $osImage; size = "Standard_A2_v2"; ip = "192.168.5.23"; natrule = "SSH-ftavmce2k8sn3"; frontendport = 62322; backendport = 22; cred = $vmCred};
+        @{name="ftavmce2vsaz"; resourcegroup = "fta-rg-ce2-win"; location = $location; nicName = "nic01-ftavmce2vsaz"; image = $image; os="Windows"; size = "Standard_A2_v2"; ip = "192.168.6.11"; natrule = "RDP-ftavmce2vsaz"; frontendport = 61189; backendport = 3389; cred = $vmCred}; 
+        @{name="ftavmce2vsmc"; resourcegroup = "fta-rg-ce2-win"; location = $location; nicName = "nic01-ftavmce2vsmc"; image = $image; os="Windows"; size = "Standard_A2_v2"; ip = "192.168.6.12"; natrule = "RDP-ftavmce2vsmc"; frontendport = 61289; backendport = 3389; cred = $vmCred};
     )
 
 # Provisioning
@@ -66,8 +72,8 @@ Add-AzureRMAccount-Allenk -myAzureEnv mooncake
     $subnet = Get-AzureRmVirtualNetworkSubnetConfig  -Name $vnetCfg.subnet -VirtualNetwork $vnet -ErrorAction Ignore
     if ($null -eq $subnet){
         Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $vnet -Name $vnetCfg.subnet -AddressPrefix $vnetCfg.subnetprefix
-        Set-AzureRmVirtualNetwork -VirtualNetwork $vnet
-        $subnet = Get-AzureRmVirtualNetworkSubnet -Name $vnetCfg.subnet -VirtualNetwork $vnet
+        $vnet = Set-AzureRmVirtualNetwork -VirtualNetwork $vnet
+        $subnet = Get-AzureRmVirtualNetworkSubnetConfig -Name $vnetCfg.subnet -VirtualNetwork $vnet
     }
 
 # create avset
@@ -96,7 +102,7 @@ Add-AzureRMAccount-Allenk -myAzureEnv mooncake
 
         $beAddressPool = New-AzureRmLoadBalancerBackendAddressPoolConfig -Name "backendPool-$($avsetCfg.name)"
     
-        if ($image.StorageProfile.OsDisk.OsType -eq "Linux"){
+        if ($vmCfg[0].os -eq "Linux"){
             $healthProbe = New-AzureRmLoadBalancerProbeConfig -Name "healthProbe-$($avsetCfg.name)" -Protocol tcp -Port 22 -IntervalInSeconds 15 -ProbeCount 2
         }
         else{
