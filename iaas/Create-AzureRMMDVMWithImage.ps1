@@ -16,7 +16,7 @@ Add-AzureRMAccount-Allenk -myAzureEnv mooncake
     $vnetCfg  = @{name = "ftavnetce2core";  resourcegroup = "fta-rg-ce2-core";  location = $location; ip = "192.168.0.0/16"; subnet = "win"; subnetprefix = "192.168.6.0/24"}
     
     # $imageCfg = @{customed=$true; name = "ftaimagece2rhel"; resourcegroup = "fta-rg-ce2-core";  location = $location}
-    $imageCfg = @{customed=$false; location = $location; publisher = "MicrosoftVisualStudio"; offer = "VisualStudio"; sku = "VS-2015-Comm-VSU3-AzureSDK-29-WS2012R2" }
+    $imageCfg = @{customed=$false; location = $location; publisher = "MicrosoftWindowsServer"; offer = "WindowsServer"; sku = "2016-Datacenter-with-Containers" }
     
     $kvCfg =    @{name = "ftakvce2core";    resourcegroup = "fta-rg-ce2-core";  location = $location; secret = "pwd-vm-win"}
 
@@ -25,7 +25,8 @@ Add-AzureRMAccount-Allenk -myAzureEnv mooncake
         $image = Get-AzureRmImage -ResourceGroupName $imageCfg.resourcegroup -ImageName $imageCfg.name
     }
     else{
-        $image = (Get-AzureRmVMImage -Location $imageCfg.location -PublisherName $imageCfg.publisher -Offer $imageCfg.offer -Skus $imageCfg.sku | Sort-Object -Descending -Property PublishedDate)[0]
+    Get-AzureRmVMImagesku  -Location $imageCfg.location -PublisherName MicrosoftWindowsServer -Offer   WindowsServer                     
+        $image = (Get-AzureRmVMImage -Location $imageCfg.location -PublisherName $imageCfg.publisher -Offer $imageCfg.offer -Skus $imageCfg.sku | Sort-Object -Descending -Property Version)[0]
     }
     # Create Credential 
     $adminUsername = Read-Host -Prompt Username
@@ -130,16 +131,38 @@ Add-AzureRMAccount-Allenk -myAzureEnv mooncake
 
 
 # create vm using windows image
-for ($i=0; $i -lt $vmCfg.Count; $i++){
+if ($imageCfg.customed -eq $true) {
+    for ($i=0; $i -lt $vmCfg.Count; $i++){
+        $vm  = New-AzureRMVMConfig -VMName $vmCfg[$i].name -VMSize $vmCfg[$i].size -AvailabilitySetID $avset.Id
+        if ($vmCfg[$i].os -eq "Linux"){
+            $vm = Set-AzureRmVMOperatingSystem -VM $vm -Credential $cred -ComputerName $vmCfg[$i].name -Linux
+        }
+        else{
+            $vm = Set-AzureRmVMOperatingSystem -VM $vm -Credential $cred -ComputerName $vmCfg[$i].name -Windows
+        }
+        $vm  = Add-AzureRMVMNetworkInterface -VM $vm -Id $nics[$i].Id
+        $vm = Set-AzureRmVMSourceImage -VM $vm -Id $Image.id
+        $vm = Set-AzureRmVMBootDiagnostics -VM $vm -Enable -ResourceGroupName $vmCfg[$i].resourcegroup -StorageAccountName $sa.StorageAccountName
 
-    $vm  = New-AzureRMVMConfig -VMName $vmCfg[$i].name -VMSize $vmCfg[$i].size -AvailabilitySetID $avset.Id
-    $vm = Set-AzureRmVMOperatingSystem -VM $vm -Credential $cred -ComputerName $vmCfg[$i].name -Linux
-    $vm  = Add-AzureRMVMNetworkInterface -VM $vm -Id $nics[$i].Id
-    $vm = Set-AzureRmVMSourceImage -VM $vm -Id $Image.id
-    $vm = Set-AzureRmVMBootDiagnostics -VM $vm -Enable -ResourceGroupName $vmCfg[$i].resourcegroup -StorageAccountName $sa.StorageAccountName
+        New-AzureRMVM -ResourceGroupName $vmCfg[$i].resourcegroup -Location $vmCfg[$i].location -VM $vm -AsJob -ErrorAction Ignore
+    }
+}
+else {
+    for ($i=0; $i -lt $vmCfg.Count; $i++){
+        $vm  = New-AzureRMVMConfig -VMName $vmCfg[$i].name -VMSize $vmCfg[$i].size -AvailabilitySetID $avset.Id
+        if ($vmCfg[$i].os -eq "Linux"){
+            $vm = Set-AzureRmVMOperatingSystem -VM $vm -Credential $cred -ComputerName $vmCfg[$i].name -Linux
+        }
+        else{
+            $vm = Set-AzureRmVMOperatingSystem -VM $vm -Credential $cred -ComputerName $vmCfg[$i].name -Windows -ProvisionVMAgent -EnableAutoUpdate
+        }
+        $vm = Add-AzureRMVMNetworkInterface -VM $vm -Id $nics[$i].Id
+        $vm = Set-AzureRmVMSourceImage -VM $vm -PublisherName $imageCfg.publisher -Offer $imageCfg.offer -Skus $imageCfg.sku -Version latest
+        $vm = Set-AzureRmVMBootDiagnostics -VM $vm -Enable -ResourceGroupName $vmCfg[$i].resourcegroup -StorageAccountName $sa.StorageAccountName
 
-    New-AzureRMVM -ResourceGroupName $vmCfg[$i].resourcegroup -Location $vmCfg[$i].location -VM $vm -AsJob -ErrorAction Ignore
+        New-AzureRMVM -ResourceGroupName $vmCfg[$i].resourcegroup -Location $vmCfg[$i].location -VM $vm -AsJob -ErrorAction Ignore
+    }
 }
 
-Get-Job | Wait-Job
 
+Get-Job | Wait-Job
