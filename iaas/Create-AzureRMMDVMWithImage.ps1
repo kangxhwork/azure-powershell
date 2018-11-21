@@ -1,54 +1,69 @@
-Import-Module C:\kangxh\PowerShell\allenk-Module-Azure.psm1
-Add-AzureRMAccount-Allenk -myAzureEnv mooncake
+Import-Module .\module\allenk-Module-Azure.psm1
+Import-Module .\module\allenk-Module-Common.psm1
 
-# Naming Conversion
-# ProjectName:   fta
-# Resource Type: vnet; avset; nlb; pip; image; kv; sa
-# region: ce2
-# usage: core; k8s
-# tag: BillTo = fta; ManagedBy = allenk@microsoft.com; Environment = Demo
-
-
-# Environment setup
-    $location = "chinaeast2"
-
-    # shared resources
-    $vnetCfg  = @{name = "ftavnetce2core";  resourcegroup = "fta-rg-ce2-core";  location = $location; ip = "192.168.0.0/16"; subnet = "win"; subnetprefix = "192.168.6.0/24"}
-    
-    # $imageCfg = @{customed=$true; name = "ftaimagece2rhel"; resourcegroup = "fta-rg-ce2-core";  location = $location}
-    $imageCfg = @{customed=$false; location = $location; publisher = "MicrosoftWindowsServer"; offer = "WindowsServer"; sku = "2016-Datacenter-with-Containers" }
-    
-    $kvCfg =    @{name = "ftakvce2core";    resourcegroup = "fta-rg-ce2-core";  location = $location; secret = "pwd-vm-win"}
-
-    # Get Image
-    if ($imageCfg.customed -eq $true){
-        $image = Get-AzureRmImage -ResourceGroupName $imageCfg.resourcegroup -ImageName $imageCfg.name
-    }
-    else{
-    Get-AzureRmVMImagesku  -Location $imageCfg.location -PublisherName MicrosoftWindowsServer -Offer   WindowsServer                     
-        $image = (Get-AzureRmVMImage -Location $imageCfg.location -PublisherName $imageCfg.publisher -Offer $imageCfg.offer -Skus $imageCfg.sku | Sort-Object -Descending -Property Version)[0]
-    }
-    # Create Credential 
-    $adminUsername = Read-Host -Prompt Username
-    $Password = Get-AzureKeyVaultSecret -VaultName $kvCfg.name -Name $kvcfg.secret
-    $cred = New-Object PSCredential $adminUsername, $Password.SecretValue
-
-    $tags = @{"BillTo" = "fta"; "ManagedBy" = "allenk@microsoft.com"; "Environment" = "Demo"}
+Add-AzureRMAccount-Allenk -myAzureEnv microsoft
 
 # Parameters
 
+    $location = "southeastasia"
+    $vmCount = 3
+
+    # use name conversion rules to build resource name
+    $nameConversion = @{project = "kangxh"; region = "sea"; svc="oss"}
+    $tags = @{"BillTo" = "kangxh"; "ManagedBy" = "allenk@microsoft.com"; "Environment" = "Prod"}
+
+    # formated resource name:
+    $newRGName = "az-rg-kangxh-oss"
+    $newVMName = "kangxhvmseaoss"
+    $newVMIP = "192.168.5.11"
+    $newAvsetName = "kangxhavsetseaoss"
+    $newNLBName = "kangxhnlbseaoss"
+    $newSAName = "kangxhsaseaossdiag"
+    $newPipName = "kangxhpipseaoss"
+    
+    # Shared Resource. Create in core resource group if not created already
+    $sharedRGName = "az-rg-kangxh-core"
+    $sharedVNetName = "kangxhvnetsea"
+    $sharedVNetIP = "192.168.0.0/16"
+    $sharedVNetSubnet = "oss"
+    $sharedVNetSubnetIP = "192.168.5.0/24"
+    $sharedKvName = "kangxhkvsea"
+    $sharedSecretName = "password-vm"
+
+    $sharedImageName = "kangxhimageseacentos" # change this value to Windows if 
+
+    $adminUsername = "allenk" # Read-Host -Prompt Username
+
+
+# Environment setup
+    
+    # shared resources
+    $vnetCfg  = @{name = $sharedVNetName;  resourcegroup = $sharedRGName;  location = $location; ip = $sharedVNetIP; subnet = $sharedVNetSubnet; subnetprefix = $sharedVNetSubnetIP}
+    
+    if ($sharedImageName -eq "Windows"){
+        $imageCfg = @{customed=$false; location = $location; publisher = "MicrosoftWindowsServer"; offer = "WindowsServer"; sku = "2016-Datacenter"; os = "Windows" }
+        $image = (Get-AzureRmVMImage -Location $imageCfg.location -PublisherName $imageCfg.publisher -Offer $imageCfg.offer -Skus $imageCfg.sku | Sort-Object -Descending -Property Version)[0]
+    }
+    else{
+        $imageCfg = @{customed=$true; name = $sharedImageName; resourcegroup = $sharedRGName;  location = $location; os = "Linux"}
+        $image = Get-AzureRmImage -ResourceGroupName $imageCfg.resourcegroup -ImageName $imageCfg.name
+    }
+  
+    $kvCfg =    @{name = $sharedKvName;    resourcegroup = $sharedRGName;  location = $location; secret = $sharedSecretName}
+    $Password = Get-AzureKeyVaultSecret -VaultName $kvCfg.name -Name $kvcfg.secret
+    $cred = New-Object PSCredential $adminUsername, $Password.SecretValue
+
+# customize parameters to structured data
+
     # new resources
-    $rgCfg =    @{name = "fta-rg-ce2-win";    location = $location}
+    $rgCfg =    @{name = $newRGName; location = $location}
 
-    $saCfg =    @{name = "ftasace2windiag";   resourcegroup = "fta-rg-ce2-win"; location = $location; sku="Standard_LRS"}
-    $avsetCfg = @{name = "ftaavsetce2winvs";    resourcegroup = "fta-rg-ce2-win"; location = $location}
-    $nlbCfg =   @{name = "ftanlbce2winvs";      resourcegroup = "fta-rg-ce2-win"; location = $location}
-    $pipCfg   = @{name = "ftapipce2winvs";      resourcegroup = "fta-rg-ce2-win"; location = $location; dns = "ftapipce2winvs"; allocation= "dynamic"}
+    $saCfg =    @{name = $newSAName; resourcegroup = $rgCfg.name; location = $location; sku="Standard_LRS"}
+    $avsetCfg = @{name = $newAvsetName;    resourcegroup = $rgCfg.name; location = $location}
+    $nlbCfg =   @{name = $newNLBName;      resourcegroup = $rgCfg.name; location = $location}
+    $pipCfg   = @{name = $newPipName;      resourcegroup = $rgCfg.name; location = $location; dns = $newPipName; allocation= "dynamic"}
 
-    $vmCfg = @(
-        @{name="ftavmce2vsaz"; resourcegroup = "fta-rg-ce2-win"; location = $location; nicName = "nic01-ftavmce2vsaz"; image = $image; os="Windows"; size = "Standard_A2_v2"; ip = "192.168.6.11"; natrule = "RDP-ftavmce2vsaz"; frontendport = 61189; backendport = 3389; cred = $vmCred}; 
-        @{name="ftavmce2vsmc"; resourcegroup = "fta-rg-ce2-win"; location = $location; nicName = "nic01-ftavmce2vsmc"; image = $image; os="Windows"; size = "Standard_A2_v2"; ip = "192.168.6.12"; natrule = "RDP-ftavmce2vsmc"; frontendport = 61289; backendport = 3389; cred = $vmCred};
-    )
+    $vmCfg = New-AllenkVMGroupArray -count $vmCount -name $newVMName -resourcegroup $rgCfg.name -location $location -os $imageCfg.os -ip $newVMIP -cred $cred 
 
 # Provisioning
 
@@ -91,7 +106,6 @@ Add-AzureRMAccount-Allenk -myAzureEnv mooncake
 
 # create nlb
     $nlb = Get-AzureRmLoadBalancer -ResourceGroupName $nlbCfg.resourcegroup -Name $nlbCfg.name -ErrorAction Ignore
-    
     if ($null -eq $nlb) {
         $feIpConfig = New-AzureRmLoadBalancerFrontendIpConfig -Name "frontendIP-$($pipCfg.name)" -PublicIpAddress $pip
 

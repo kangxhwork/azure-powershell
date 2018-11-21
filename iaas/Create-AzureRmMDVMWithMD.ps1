@@ -11,7 +11,7 @@ $contextEnv = Get-AzureRmContext
 
 
 # Environment setup
-    $location = "chinaeast2"
+    $location = "southeastasia"
     $tags = @{"BillTo" = "kangxh"; "ManagedBy" = "allenk@microsoft.com"; "Environment" = "kangxh"}
 
 
@@ -28,7 +28,7 @@ $contextEnv = Get-AzureRmContext
     $nlbCfg =   @{name = "kangxhnlbseawin";      resourcegroup = $targetResourceGroupCfg.name; location = $location}
     $pipCfg   = @{name = "kangxhpipseawin";      resourcegroup = $targetResourceGroupCfg.name; location = $location; dns = "kangxhpipseawin"; allocation= "dynamic"}
 
-    $vmCfg = @{name="kangxhvmseavs"; resourcegroup = $targetResourceGroupCfg.name; location = $location; nicName = "nic01-kangxhvmseacentos"; diskname = "kangxhvmseavs-os"; ostype = "Linux"; diskuri="https://kangxhsaseacorev1.blob.core.chinacloudapi.cn/vhds/centos73.vhd"; storagesku="Standard_LRS"; size = "Standard_A2_v2"; ip = "192.168.4.12"; natrule = "SSH-kangxhvmseacentos"; frontendport = 61222; backendport = 22}; 
+    $vmCfg = @{name="kangxhvmseavs"; resourcegroup = $targetResourceGroupCfg.name; location = $location; nicName = "nic01-kangxhvmseacentos"; diskname = "kangxhvmseavs-os"; ostype = "Windows"; storagesku="Standard_LRS"; size = "Standard_A2_v2"; ip = "192.168.4.11"; natrule = "RDP-kangxhvmseacentos"; frontendport = 61189; backendport = 3389}; 
 
 # Provisioning
 
@@ -107,12 +107,15 @@ $contextEnv = Get-AzureRmContext
 
 
 # create vm using existing vhd
-    $diskConfig = New-AzureRmDiskConfig -AccountType $vmCfg.storagesku -Location $vmCfg.location -CreateOption import -SourceUri $vmCfg.diskuri -OsType Linux 
-    $osDisk = New-AzureRmDisk -ResourceGroupName $vmCfg.resourcegroup -DiskName $vmCfg.diskname -Disk $diskConfig
+    $osDisk = Get-AzureRmDisk -ResourceGroupName $vmCfg.resourcegroup -DiskName $vmCfg.diskname
 
     $vm = New-AzureRmVMConfig -VMName $vmCfg.name -VMSize $vmCfg.size -AvailabilitySetId $avset.Id
-    Set-AzureRmVMOSDisk -vm $vm -ManagedDiskId $osDisk.Id -Caching ReadOnly -CreateOption attach -Linux -Name $osDisk.Name -StorageAccountType Standard_LRS -DiskSizeInGB 64
+    if ($vmCfg.ostype -eq "Linux"){
+        Set-AzureRmVMOSDisk -vm $vm -ManagedDiskId $osDisk.Id -Caching ReadOnly -CreateOption attach -Linux -Name $osDisk.Name -StorageAccountType Standard_LRS
+    }
+    else {
+        Set-AzureRmVMOSDisk -vm $vm -ManagedDiskId $osDisk.Id -Caching ReadOnly -CreateOption attach -Windows -Name $osDisk.Name -StorageAccountType Standard_LRS
+    }
     Add-AzureRmVMNetworkInterface -vm $vm -Id $nic.Id
 
     New-AzureRmVM -ResourceGroupName $vmCfg.resourcegroup -Location $vmCfg.location -VM $vm
-
