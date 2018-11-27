@@ -8,7 +8,7 @@ $remoteProtocol["Linux"] = "SSH"
 
 
 # https://4sysops.com/archives/convert-json-to-a-powershell-hash-table/
-function allenk-ConvertToHashtable {
+function ConvertTo-allenkCollectionToHashtable {
     [CmdletBinding()]
     [OutputType('hashtable')]
     param (
@@ -106,21 +106,19 @@ function global:New-AllenkVMGroupArray {
     [Parameter( Mandatory=$true)] [string]$os,
     [Parameter( Mandatory=$false)] [string]$size = "Standard_A2_V2",
     [Parameter( Mandatory=$true)] [string]$ip,
-    [Parameter( Mandatory=$true)] [PSCredential]$cred
+    [Parameter( Mandatory=$false)] [PSCredential]$cred
     )
 
     process{
-
-        $vmArray = @()
+        
         
         if ($count -eq 1) {
-        
             $frontendPort = New-AllenkCustomPortMapping  -ipaddr $ip -port $remotePort[$os]
-            $vm = @{name=$name; resourcegroup = $resourcegroup; location = $location; nicname = "nic01-$name"; image = $image; os=$os; size = $size; ip = $ip; natrule = "$($remoteProtocol[$os])-$name"; frontendport = $frontendPort; backendport = $remotePort["$os"]; cred = $vmCred}
-
-            return [array](@($vm))
+            $vm = @{name=$name; resourcegroup = $resourcegroup; location = $location; nicname = "nic01-$name"; os=$os; size = $size; ip = $ip; natrule = "$($remoteProtocol[$os])-$name"; frontendport = $frontendPort; backendport = $remotePort["$os"]; cred = $vmCred}
+            return $vm
         }
 
+        $vmArray = @()
         for ($i=1; $i -le $count; $i++){
             # create new vm name in the group
             $newName = $name + $i.ToString()

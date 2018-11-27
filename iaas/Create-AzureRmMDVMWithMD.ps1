@@ -1,42 +1,62 @@
-Import-Module C:\kangxh\PowerShell\allenk-Module-Azure.psm1
+cd C:\kangxh\github\azure-powershell
+
+Import-Module .\module\allenk-Module-Azure.psm1
+Import-Module .\module\allenk-Module-Common.psm1
+
 Add-AzureRMAccount-Allenk -myAzureEnv microsoft
-$contextEnv = Get-AzureRmContext
-
-# Naming Conversion
-# ProjectName:   kangxh
-# Resource Type: vnet; avset; nlb; pip; image; kv; sa
-# region: sea
-# usage: core; k8s
-# tag: BillTo = kangxh; ManagedBy = allenk@microsoft.com; Environment = Demo
-
-
-# Environment setup
-    $location = "southeastasia"
-    $tags = @{"BillTo" = "kangxh"; "ManagedBy" = "allenk@microsoft.com"; "Environment" = "kangxh"}
-
 
 # Parameters
 
+    $location = "southeastasia"
+    
+    # use name conversion rules to build resource name
+    $nameConversion = @{project = "kangxh"; region = "sea"; svc="local"}
+    $tags = @{"BillTo" = "kangxh"; "ManagedBy" = "allenk@microsoft.com"; "Environment" = "Prod"}
+
+    # formated resource name:
+    $newRGName = "az-rg-kangxh-onprem" # Resource Group must be already there since MD Disk need to be in that Resource Group before run the script. 
+    $newVMName = "kangxhvmonprhv"
+    $newVMIP = "10.1.1.11"
+    $newOSDisk = "kangxhvmonprhv_OsDisk_1_ba494be96a324bb2a9ff86f92a2e166c"
+    $newOS = "Windows"
+    $newVMSize = "Standard_D2s_v3"
+
+    $newAvsetName = "kangxhavsetseaonpremds"
+    $newNLBName = "kangxhnlbseaonpremds"
+    $newSAName = "kangxhsaseaonpremds"
+    $newPipName = "kangxhpipseaonpremds"
+    
+    # Shared Resource. Create in core resource group if not created already
+    $sharedRGName = "az-rg-kangxh-core"
+    $sharedVNetName = "kangxhvnetseaonprem"
+    $sharedVNetIP = "10.1.0.0/16"
+    $sharedVNetSubnet = "dsvm"
+    $sharedVNetSubnetIP = "10.1.1.11/24"
+    $sharedKvName = "kangxhkvsea"
+    $sharedSecretName = "password-vm"
+
+    $sharedImageName = "Windows" # change this value to Windows if we will use the Windows image
+
+# Environment setup
+    
+    # shared resources
+    $vnetCfg  = @{name = $sharedVNetName;  resourcegroup = $sharedRGName;  location = $location; ip = $sharedVNetIP; subnet = $sharedVNetSubnet; subnetprefix = $sharedVNetSubnetIP}
+    
+# customize parameters to structured data
+
     # new resources
-    $sharedResourceGroupCfg = @{name = "az-rg-kangxh-core";    location = $location}
-    $vnetCfg  = @{name = "kangxhvnetsea";    resourcegroup = $sharedResourceGroupCfg.name;  location = $location; ip = "192.168.0.0/16"; subnet = "win"; subnetprefix = "192.168.4.0/24"}
+    $rgCfg =    @{name = $newRGName; location = $location}
 
-    $targetResourceGroupCfg =    @{name = "az-rg-kangxh-win";    location = $location}
+    $saCfg =    @{name = $newSAName; resourcegroup = $rgCfg.name; location = $location; sku="Standard_LRS"}
+    $avsetCfg = @{name = $newAvsetName;    resourcegroup = $rgCfg.name; location = $location}
+    $nlbCfg =   @{name = $newNLBName;      resourcegroup = $rgCfg.name; location = $location}
+    $pipCfg   = @{name = $newPipName;      resourcegroup = $rgCfg.name; location = $location; dns = $newPipName; allocation= "dynamic"}
 
-    $saCfg =    @{name = "kangxhsaseawindiag";   resourcegroup = $targetResourceGroupCfg.name; location = $location; sku="Standard_LRS"}
-    $avsetCfg = @{name = "kangxhavsetseawin";    resourcegroup = $targetResourceGroupCfg.name; location = $location}
-    $nlbCfg =   @{name = "kangxhnlbseawin";      resourcegroup = $targetResourceGroupCfg.name; location = $location}
-    $pipCfg   = @{name = "kangxhpipseawin";      resourcegroup = $targetResourceGroupCfg.name; location = $location; dns = "kangxhpipseawin"; allocation= "dynamic"}
+    $vmCfg= New-AllenkVMGroupArray -count 1 -name $newVMName -resourcegroup $newRGName -location $location -os $newOS -ip $newVMIP -size $newVMSize
 
-    $vmCfg = @{name="kangxhvmseavs"; resourcegroup = $targetResourceGroupCfg.name; location = $location; nicName = "nic01-kangxhvmseacentos"; diskname = "kangxhvmseavs-os"; ostype = "Windows"; storagesku="Standard_LRS"; size = "Standard_A2_v2"; ip = "192.168.4.11"; natrule = "RDP-kangxhvmseacentos"; frontendport = 61189; backendport = 3389}; 
+    
 
 # Provisioning
-
-# create resource group.
-    $rg = Get-AzureRmResourceGroup -Name $sharedResourceGroupCfg.name -Location $sharedResourceGroupCfg.location -ErrorAction Ignore
-    if($null -eq $rg){
-        $rg = New-AzureRmResourceGroup -Name $sharedResourceGroupCfg.name -Location $sharedResourceGroupCfg.location -Tag $tags
-    }
 
     # create storage account: 
     $sa = Get-AzureRmStorageAccount -ResourceGroupName $saCfg.resourcegroup -Name $saCfg.name -ErrorAction Ignore
@@ -53,7 +73,7 @@ $contextEnv = Get-AzureRmContext
     $subnet = Get-AzureRmVirtualNetworkSubnetConfig  -Name $vnetCfg.subnet -VirtualNetwork $vnet -ErrorAction Ignore
     if ($null -eq $subnet){
         Add-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $vnet -Name $vnetCfg.subnet -AddressPrefix $vnetCfg.subnetprefix
-        Set-AzureRmVirtualNetwork -VirtualNetwork $vnet
+        $vnet = Set-AzureRmVirtualNetwork -VirtualNetwork $vnet
         $subnet = Get-AzureRmVirtualNetworkSubnetConfig -Name $vnetCfg.subnet -VirtualNetwork $vnet
     }
 
@@ -69,41 +89,81 @@ $contextEnv = Get-AzureRmContext
         $pip = New-AzureRmPublicIpAddress -ResourceGroupName $pipCfg.resourcegroup -Name $pipCfg.name -Location $pipCfg.location -AllocationMethod $pipCfg.allocation -DomainNameLabel $pipCfg.dns
     }
 
-# create nlb
+# create nlb and inboundnat rules. if nlb is there already, add inbound rules when creating nic
     $nlb = Get-AzureRmLoadBalancer -ResourceGroupName $nlbCfg.resourcegroup -Name $nlbCfg.name -ErrorAction Ignore
     if ($null -eq $nlb) {
         $feIpConfig = New-AzureRmLoadBalancerFrontendIpConfig -Name "frontendIP-$($pipCfg.name)" -PublicIpAddress $pip
-        $natrule = New-AzureRmLoadBalancerInboundNatRuleConfig -Name $vmCfg.natrule -FrontendIpConfiguration $feIpConfig -Protocol TCP -FrontendPort $vmCfg.frontendport -BackendPort $vmCfg.backendport
+
+        $inboundNATRules=@()
+        for ($i=0; $i -lt $vmCfg.Count; $i++){
+           $natrule = New-AzureRmLoadBalancerInboundNatRuleConfig -Name $vmCfg[$i].natrule -FrontendIpConfiguration $feIpConfig -Protocol TCP -FrontendPort $vmCfg[$i].frontendport -BackendPort $vmCfg[$i].backendport
+           $inboundNATRules += $natrule
+        }
+
         $beAddressPool = New-AzureRmLoadBalancerBackendAddressPoolConfig -Name "backendPool-$($avsetCfg.name)"
     
-        if ($vmCfg.ostype -eq "Linux"){
+        if ($vmCfg[0].os -eq "Linux"){
             $healthProbe = New-AzureRmLoadBalancerProbeConfig -Name "healthProbe-$($avsetCfg.name)" -Protocol tcp -Port 22 -IntervalInSeconds 15 -ProbeCount 2
         }
         else{
             $healthProbe = New-AzureRmLoadBalancerProbeConfig -Name "healthProbe-$($avsetCfg.name)" -Protocol tcp -Port 3389 -IntervalInSeconds 15 -ProbeCount 2
         }
 
-        $nlb = New-AzureRmLoadBalancer -ResourceGroupName $nlbCfg.resourcegroup -Location $nlbCfg.location -Name $nlbCfg.name -FrontendIpConfiguration $feIpConfig -InboundNatRule $natrule -BackendAddressPool $beAddressPool -Probe $healthProbe
+        $nlb = New-AzureRmLoadBalancer -ResourceGroupName $nlbCfg.resourcegroup -Location $nlbCfg.location -Name $nlbCfg.name `
+            -FrontendIpConfiguration $feIpConfig -InboundNatRule $inboundNATRules -BackendAddressPool $beAddressPool -Probe $healthProbe
     }
-    else{
 
-        $feIpConfig = Get-AzureRmLoadBalancerFrontendIpConfig -LoadBalancer $nlb
-        $inboundNatRuleConfig = Get-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $nlb
-        $beAddressPoolConfig = Get-AzureRmLoadBalancerBackendAddressPoolConfig -LoadBalancer $nlb
-    
-        if (($beAddressPoolConfig.Name -eq "backendPool-$($avset.name)") -and ($feIpConfig.Name -eq "frontendIP-$($pip.name)")){ # this VM has same PIP configure and belongs to same avset, add NAT rule
-            Add-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $nlb -Name $vmCfg.natrule -FrontendIpConfiguration $feIpConfig -Protocol TCP -FrontendPort $vmCfg.frontendport -BackendPort $vmCfg.backendport | Set-AzureRmLoadBalancer
+# create nic and inbound nat rules.
+    $nics=@()
+    for ($i=0; $i -lt $vmCfg.Count; $i++){
 
-            $nlb = Get-AzureRmLoadBalancer -ResourceGroupName $nlbCfg.resourcegroup -Name $nlbCfg.name -ErrorAction Ignore
-            $natrule = $nlb.InboundNatRules.GetEnumerator() | where {$_.Name -eq $vmCfg.natrule}
+        $nic = Get-AzureRmNetworkInterface -ResourceGroupName $vmCfg[$i].resourcegroup -Name $vmCfg[$i].nicname -ErrorAction Ignore
+        if ($nic) {
+            $nics += $nic 
+        }
+        else{
+            $newInboundNatRule = add-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $nlb -Name $vmCfg[$i].natrule -FrontendIpConfiguration $nlb.FrontendIpConfigurations[0] -Protocol TCP -FrontendPort $vmCfg[$i].frontendport -BackendPort $vmCfg[$i].backendport
+            Set-AzureRmLoadBalancer -LoadBalancer $nlb
+
+            $nic = New-AzureRmNetworkInterface -ResourceGroupName $vmCfg[$i].resourcegroup -Name $vmCfg[$i].nicname -Location $vmCfg[$i].location -Subnet $subnet `
+                -LoadBalancerInboundNatRule $nlb.InboundNatRules[-1] -LoadBalancerBackendAddressPool $nlb.BackendAddressPools[0] -PrivateIpAddress $vmCfg[$i].ip 
+            $nics += $nic 
         }
     }
 
-# create nic
-   $nic = Get-AzureRmNetworkInterface -ResourceGroupName $vmCfg.resourcegroup -Name $vmCfg.nicname -ErrorAction Ignore
-    if ($null -eq $nic) {
-        $nic = New-AzureRmNetworkInterface -ResourceGroupName $vmCfg.resourcegroup -Name $vmCfg.nicname -Location $vmCfg.location -Subnet $subnet -LoadBalancerInboundNatRule $natrule -LoadBalancerBackendAddressPool $nlb.BackendAddressPools[0] -PrivateIpAddress $vmCfg.ip 
+# create vm using windows image
+if ($imageCfg.customed -eq $true) {
+    for ($i=0; $i -lt $vmCfg.Count; $i++){
+        $vm  = New-AzureRMVMConfig -VMName $vmCfg[$i].name -VMSize $vmCfg[$i].size -AvailabilitySetID $avset.Id
+        if ($vmCfg[$i].os -eq "Linux"){
+            $vm = Set-AzureRmVMOperatingSystem -VM $vm -Credential $cred -ComputerName $vmCfg[$i].name -Linux
+        }
+        else{
+            $vm = Set-AzureRmVMOperatingSystem -VM $vm -Credential $cred -ComputerName $vmCfg[$i].name -Windows
+        }
+        $vm  = Add-AzureRMVMNetworkInterface -VM $vm -Id $nics[$i].Id
+        $vm = Set-AzureRmVMSourceImage -VM $vm -Id $Image.id
+        $vm = Set-AzureRmVMBootDiagnostics -VM $vm -Enable -ResourceGroupName $vmCfg[$i].resourcegroup -StorageAccountName $sa.StorageAccountName
+
+        New-AzureRMVM -ResourceGroupName $vmCfg[$i].resourcegroup -Location $vmCfg[$i].location -VM $vm -AsJob -ErrorAction Ignore
     }
+}
+else {
+    for ($i=0; $i -lt $vmCfg.Count; $i++){
+        $vm  = New-AzureRMVMConfig -VMName $vmCfg[$i].name -VMSize $vmCfg[$i].size -AvailabilitySetID $avset.Id
+        if ($vmCfg[$i].os -eq "Linux"){
+            $vm = Set-AzureRmVMOperatingSystem -VM $vm -Credential $cred -ComputerName $vmCfg[$i].name -Linux
+        }
+        else{
+            $vm = Set-AzureRmVMOperatingSystem -VM $vm -Credential $cred -ComputerName $vmCfg[$i].name -Windows -ProvisionVMAgent -EnableAutoUpdate
+        }
+        $vm = Add-AzureRMVMNetworkInterface -VM $vm -Id $nics[$i].Id
+        $vm = Set-AzureRmVMSourceImage -VM $vm -PublisherName $imageCfg.publisher -Offer $imageCfg.offer -Skus $imageCfg.sku -Version latest
+        $vm = Set-AzureRmVMBootDiagnostics -VM $vm -Enable -ResourceGroupName $vmCfg[$i].resourcegroup -StorageAccountName $sa.StorageAccountName
+
+        New-AzureRMVM -ResourceGroupName $vmCfg[$i].resourcegroup -Location $vmCfg[$i].location -VM $vm -AsJob -ErrorAction Ignore
+    }
+}
 
 
 # create vm using existing vhd

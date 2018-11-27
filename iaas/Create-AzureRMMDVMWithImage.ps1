@@ -1,3 +1,5 @@
+cd C:\kangxh\github\azure-powershell
+
 Import-Module .\module\allenk-Module-Azure.psm1
 Import-Module .\module\allenk-Module-Common.psm1
 
@@ -6,31 +8,31 @@ Add-AzureRMAccount-Allenk -myAzureEnv microsoft
 # Parameters
 
     $location = "southeastasia"
-    $vmCount = 3
-
+    
     # use name conversion rules to build resource name
-    $nameConversion = @{project = "kangxh"; region = "sea"; svc="oss"}
+    $nameConversion = @{project = "kangxh"; region = "sea"; svc="local"}
     $tags = @{"BillTo" = "kangxh"; "ManagedBy" = "allenk@microsoft.com"; "Environment" = "Prod"}
 
     # formated resource name:
-    $newRGName = "az-rg-kangxh-oss"
-    $newVMName = "kangxhvmseaoss"
-    $newVMIP = "192.168.5.11"
-    $newAvsetName = "kangxhavsetseaoss"
-    $newNLBName = "kangxhnlbseaoss"
-    $newSAName = "kangxhsaseaossdiag"
-    $newPipName = "kangxhpipseaoss"
+    $newRGName = "az-rg-kangxh-win"
+    $newVMName = "kangxhvmseadev"
+    $newVMIP = "192.168.4.12"
+    $vmCount = 1
+    $newAvsetName = "kangxhavsetseawin"
+    $newNLBName = "kangxhnlbseawin"
+    $newSAName = "kangxhsaseawin"
+    $newPipName = "kangxhpipseawin"
     
     # Shared Resource. Create in core resource group if not created already
     $sharedRGName = "az-rg-kangxh-core"
     $sharedVNetName = "kangxhvnetsea"
     $sharedVNetIP = "192.168.0.0/16"
-    $sharedVNetSubnet = "oss"
-    $sharedVNetSubnetIP = "192.168.5.0/24"
+    $sharedVNetSubnet = "win"
+    $sharedVNetSubnetIP = "192.168.4.0/24"
     $sharedKvName = "kangxhkvsea"
     $sharedSecretName = "password-vm"
 
-    $sharedImageName = "kangxhimageseacentos" # change this value to Windows if 
+    $sharedImageName = "Windows" # change this value to Windows if we will use the Windows image
 
     $adminUsername = "allenk" # Read-Host -Prompt Username
 
@@ -63,7 +65,7 @@ Add-AzureRMAccount-Allenk -myAzureEnv microsoft
     $nlbCfg =   @{name = $newNLBName;      resourcegroup = $rgCfg.name; location = $location}
     $pipCfg   = @{name = $newPipName;      resourcegroup = $rgCfg.name; location = $location; dns = $newPipName; allocation= "dynamic"}
 
-    $vmCfg = New-AllenkVMGroupArray -count $vmCount -name $newVMName -resourcegroup $rgCfg.name -location $location -os $imageCfg.os -ip $newVMIP -cred $cred 
+    $vmCfg= @(New-AllenkVMGroupArray -count $vmCount -name $newVMName -resourcegroup $rgCfg.name -location $location -os $imageCfg.os -ip $newVMIP -cred $cred )
 
 # Provisioning
 
@@ -104,7 +106,7 @@ Add-AzureRMAccount-Allenk -myAzureEnv microsoft
         $pip = New-AzureRmPublicIpAddress -ResourceGroupName $pipCfg.resourcegroup -Name $pipCfg.name -Location $pipCfg.location -AllocationMethod $pipCfg.allocation -DomainNameLabel $pipCfg.dns
     }
 
-# create nlb
+# create nlb and inboundnat rules. if nlb is there already, add inbound rules when creating nic
     $nlb = Get-AzureRmLoadBalancer -ResourceGroupName $nlbCfg.resourcegroup -Name $nlbCfg.name -ErrorAction Ignore
     if ($null -eq $nlb) {
         $feIpConfig = New-AzureRmLoadBalancerFrontendIpConfig -Name "frontendIP-$($pipCfg.name)" -PublicIpAddress $pip
@@ -128,7 +130,7 @@ Add-AzureRMAccount-Allenk -myAzureEnv microsoft
             -FrontendIpConfiguration $feIpConfig -InboundNatRule $inboundNATRules -BackendAddressPool $beAddressPool -Probe $healthProbe
     }
 
-# create nic
+# create nic and inbound nat rules.
     $nics=@()
     for ($i=0; $i -lt $vmCfg.Count; $i++){
 
@@ -137,12 +139,14 @@ Add-AzureRMAccount-Allenk -myAzureEnv microsoft
             $nics += $nic 
         }
         else{
+            $newInboundNatRule = add-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $nlb -Name $vmCfg[$i].natrule -FrontendIpConfiguration $nlb.FrontendIpConfigurations[0] -Protocol TCP -FrontendPort $vmCfg[$i].frontendport -BackendPort $vmCfg[$i].backendport
+            Set-AzureRmLoadBalancer -LoadBalancer $nlb
+
             $nic = New-AzureRmNetworkInterface -ResourceGroupName $vmCfg[$i].resourcegroup -Name $vmCfg[$i].nicname -Location $vmCfg[$i].location -Subnet $subnet `
-                -LoadBalancerInboundNatRule $nlb.InboundNatRules[$i] -LoadBalancerBackendAddressPool $nlb.BackendAddressPools[0] -PrivateIpAddress $vmCfg[$i].ip 
+                -LoadBalancerInboundNatRule $nlb.InboundNatRules[-1] -LoadBalancerBackendAddressPool $nlb.BackendAddressPools[0] -PrivateIpAddress $vmCfg[$i].ip 
             $nics += $nic 
         }
     }
-
 
 # create vm using windows image
 if ($imageCfg.customed -eq $true) {
@@ -177,6 +181,3 @@ else {
         New-AzureRMVM -ResourceGroupName $vmCfg[$i].resourcegroup -Location $vmCfg[$i].location -VM $vm -AsJob -ErrorAction Ignore
     }
 }
-
-
-Get-Job | Wait-Job
