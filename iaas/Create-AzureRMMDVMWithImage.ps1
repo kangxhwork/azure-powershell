@@ -14,25 +14,25 @@ Add-AzureRMAccount-Allenk -myAzureEnv microsoft
     $tags = @{"BillTo" = "kangxh"; "ManagedBy" = "allenk@microsoft.com"; "Environment" = "Prod"}
 
     # formated resource name:
-    $newRGName = "az-rg-kangxh-win"
-    $newVMName = "kangxhvmseadev"
-    $newVMIP = "192.168.4.12"
+    $newRGName = "az-rg-kangxh-oss"
+    $newVMName = "kangxhvmseaoss"
+    $newVMIP = " 192.168.5.10"
     $vmCount = 1
-    $newAvsetName = "kangxhavsetseawin"
-    $newNLBName = "kangxhnlbseawin"
-    $newSAName = "kangxhsaseawin"
-    $newPipName = "kangxhpipseawin"
+    $newAvsetName = "kangxhavsetseaoss"
+    $newNLBName = "kangxhnlbseaoss"
+    $newSAName = "kangxhsaseaossdiag"
+    $newPipName = "kangxhpipseaoss"
     
     # Shared Resource. Create in core resource group if not created already
     $sharedRGName = "az-rg-kangxh-core"
     $sharedVNetName = "kangxhvnetsea"
     $sharedVNetIP = "192.168.0.0/16"
-    $sharedVNetSubnet = "win"
-    $sharedVNetSubnetIP = "192.168.4.0/24"
+    $sharedVNetSubnet = "oss"
+    $sharedVNetSubnetIP = "192.168.5.0/24"
     $sharedKvName = "kangxhkvsea"
     $sharedSecretName = "password-vm"
 
-    $sharedImageName = "Windows" # change this value to Windows if we will use the Windows image
+    $sharedImageName = "kangxhimageseacentos" # change this value to Windows if we will use the Windows image
 
     $adminUsername = "allenk" # Read-Host -Prompt Username
 
